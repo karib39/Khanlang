@@ -1,0 +1,22 @@
+[build-system]
+requires = ["setuptools>=61"]
+build-backend = "setuptools.build_meta"
+
+[project]
+name = "khanlang"
+version = "1.0.0"
+description = "A beginner-friendly programming language"
+requires-python = ">=3.8"
+
+[project.scripts]
+khan = "khan_program:main"
+
+[tool.setuptools]
+py-modules = [
+    "khan_program",
+    "khan_lexer",
+    "khan_token",
+    "khan_ast",
+    "statement",
+    "expr_parser"
+]

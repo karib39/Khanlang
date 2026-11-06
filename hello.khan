@@ -1,0 +1,17 @@
+func getstatus(age) {
+    if age >= 18 {
+        return "Adult"
+    } else {
+        return "Minor"
+    }
+}
+
+create age = 20
+create count = 1
+
+show getstatus(age)
+
+while count <= 3 {
+    show count
+    create count = count + 1
+}
