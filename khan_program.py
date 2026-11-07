@@ -137,12 +137,15 @@ def main():
 
     except FileNotFoundError:
         print(f"Error: File {filename} not found")
+        sys.exit(1)
 
     except PermissionError:
         print(f"Error: Permission denied while reading {filename}")
+        sys.exit(1)
 
     except (SyntaxError, NameError, TypeError, ZeroDivisionError) as error:
         print(f"Khanlang Error: {error}")
+        sys.exit(1)
 
 
 if __name__ == "__main__":

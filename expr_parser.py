@@ -1,15 +1,18 @@
-from khan_ast import BinaryOp, UnaryOp, Variable, String, evaluate_ast, FunctionCall
+
+from khan_ast import BinaryOp, UnaryOp, Variable, String, FunctionCall
 
 
 def parse_number(tokens):
     if len(tokens) != 1:
-        raise ValueError("EXpected exactly one number")
+        raise ValueError("Expected exactly one number")
+
     token = tokens[0]
 
     if isinstance(token, (int, float)) and not isinstance(token, bool):
         return token
 
     raise ValueError(f"Expected a number, got {token!r}")
+
 
 def split_arguments(tokens):
     if not tokens:
@@ -28,23 +31,28 @@ def split_arguments(tokens):
         if token == "," and depth == 0:
             if not current_arguments:
                 raise SyntaxError("Missing function argument")
+
             arguments.append(current_arguments)
             current_arguments = []
         else:
             current_arguments.append(token)
 
     if not current_arguments:
-        raise SyntaxError("Missing function arguments")
+        raise SyntaxError("Missing function argument")
+
     arguments.append(current_arguments)
 
     return arguments
+
 
 def parse_factor(tokens):
     if len(tokens) == 1:
         if isinstance(tokens[0], String):
             return tokens[0]
+
         if isinstance(tokens[0], Variable):
             return tokens[0]
+
         return parse_number(tokens)
 
     if len(tokens) >= 3 and isinstance(tokens[0], Variable):
@@ -64,12 +72,11 @@ def parse_factor(tokens):
         operand = parse_factor(tokens[1:])
         return UnaryOp("-", operand)
 
-
     if is_wrapped_in_parentheses(tokens):
-        inner_tokens = tokens[1:-1]
-        return parse_expression(inner_tokens)
+        return parse_expression(tokens[1:-1])
 
-    raise ValueError("Invalid FActor")
+    raise ValueError("Invalid factor")
+
 
 def is_wrapped_in_parentheses(tokens):
     if len(tokens) < 2:
@@ -83,12 +90,11 @@ def is_wrapped_in_parentheses(tokens):
     for index, token in enumerate(tokens):
         if token == "(":
             depth += 1
-
         elif token == ")":
             depth -= 1
 
-        elif depth == 0 and index < len(tokens):
-            return False
+            if depth == 0 and index != len(tokens) - 1:
+                return False
 
     return depth == 0
 
@@ -115,9 +121,21 @@ def find_factor_end(tokens, start):
 
             raise ValueError("Unclosed function call")
 
-    if tokens[start] != "(":
-        return start
+    if tokens[start] == "(":
+        depth = 0
 
+        for i in range(start, len(tokens)):
+            if tokens[i] == "(":
+                depth += 1
+            elif tokens[i] == ")":
+                depth -= 1
+
+                if depth == 0:
+                    return i
+
+        raise ValueError("Unclosed parentheses")
+
+    return start
 
 
 def parse_term(tokens):
@@ -137,10 +155,13 @@ def parse_term(tokens):
             raise ValueError(f"Unexpected operator: {operator!r}")
 
         start = i + 1
+
         if start >= len(tokens):
-            raise  ValueError("Missing  right operand")
-        if tokens[start] in ["*","/","+"]:
+            raise ValueError("Missing right operand")
+
+        if tokens[start] in ["*", "/", "+"]:
             raise ValueError("Expected a factor after operator")
+
         end = find_factor_end(tokens, start)
         right = parse_factor(tokens[start:end + 1])
 
@@ -164,7 +185,8 @@ def validate_parentheses(tokens):
                 raise ValueError("Unexpected closing parentheses")
 
     if depth > 0:
-        raise ValueError("Unlosed parentheses")
+        raise ValueError("Unclosed parentheses")
+
 
 def find_comparison_index(tokens):
     depth = 0
@@ -175,58 +197,61 @@ def find_comparison_index(tokens):
             depth += 1
         elif token == ")":
             depth -= 1
-
-        elif token in ["==","!=",">","<","<=",">="] and depth == 0:
+        elif token in ["==", "!=", ">", "<", "<=", ">="] and depth == 0:
             if comparison_index != -1:
-                raise SyntaxError("Multiple comparison operators are not supported")
+                raise SyntaxError(
+                    "Multiple comparison operators are not supported"
+                )
+
             comparison_index = index
+
     return comparison_index
 
 
-
 def parse_expression(tokens):
+    try:
+        if not tokens:
+            raise ValueError("Expected an expression")
 
-    if not tokens:
-        raise ValueError("Expected an expression")
+        validate_parentheses(tokens)
 
-    validate_parentheses(tokens)
+        comparison_index = find_comparison_index(tokens)
 
-    comparison_index = find_comparison_index(tokens)
+        if comparison_index != -1:
+            left_token = tokens[:comparison_index]
+            operator = tokens[comparison_index]
+            right_token = tokens[comparison_index + 1:]
 
-    if comparison_index != -1:
-        left_token = tokens[:comparison_index]
-        operator = tokens[comparison_index]
-        right_token = tokens[comparison_index + 1:]
+            left = parse_expression(left_token)
+            right = parse_expression(right_token)
 
-        left = parse_expression(left_token)
-        right = parse_expression(right_token)
+            return BinaryOp(operator, left, right)
 
-        return BinaryOp(operator, left, right)
+        if is_wrapped_in_parentheses(tokens):
+            return parse_expression(tokens[1:-1])
 
+        split_index = find_split_index(tokens)
 
-    if is_wrapped_in_parentheses(tokens):
-        return parse_expression(tokens[1:-1])
-    split_index = find_split_index(tokens)
+        if split_index != -1:
+            left_token = tokens[:split_index]
+            operator = tokens[split_index]
+            right_token = tokens[split_index + 1:]
 
-    if split_index != -1:
-        if split_index == 0 and split_index == len(tokens) - 1:
-            raise ValueError("missing operand")
+            left = parse_expression(left_token)
+            right = parse_term(right_token)
 
-        left_token = tokens[:split_index]
-        operator = tokens[split_index]
-        right_token = tokens[split_index + 1:]
+            return BinaryOp(operator, left, right)
 
-        left = parse_expression(left_token)
-        right = parse_term(right_token)
-        return BinaryOp(operator, left, right)
-    return parse_term(tokens)
+        return parse_term(tokens)
 
+    except ValueError as error:
+        raise SyntaxError(str(error)) from error
 
 def find_split_index(tokens):
     depth = 0
     split_index = -1
 
-    for index,token in enumerate(tokens):
+    for index, token in enumerate(tokens):
         if token == "(":
             depth += 1
         elif token == ")":
@@ -234,5 +259,7 @@ def find_split_index(tokens):
         elif token in ["+", "-"] and depth == 0:
             if index == 0 or tokens[index - 1] in ["+", "-", "*", "/", "("]:
                 continue
+
             split_index = index
+
     return split_index
